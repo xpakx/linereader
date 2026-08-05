@@ -33,13 +33,22 @@ int append_end(EditorState *state, char c) {
 		char *new_buffer = realloc(state->buffer, state->buflen);
 		if (!new_buffer) {
 			free(state->buffer);
-			return 1;
+			return 0;
 		}
 		state->buffer = new_buffer;
 	}
 
 	state->buffer[state->len++] = c;
 	state->buffer[state->len] = '\0';
+	return 1;
+}
+
+int backspace(EditorState *state) {
+	if (state->len > 0) {
+		state->len--;
+		state->buffer[state->len] = '\0';
+		return 1;
+	}
 	return 0;
 }
 
@@ -61,9 +70,10 @@ char *readline(const char *prompt) {
 		if (c == '\n' || c == '\r') {
 			// enter
 			break;
+		} else if (c == 127 || c == 8) {
+			if (backspace(&state)) write(STDOUT_FILENO, "\b \b", 3);
 		} else if (c >= 32 && c < 127) {
-			int res = append_end(&state, c);
-			if (res > 0) {
+			if (!append_end(&state, c)) {
 				return NULL;
 			}
 
