@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <signal.h>
 
 struct termios orig_termios;
 
@@ -25,6 +26,7 @@ typedef struct {
 	char *buffer;
 	int buflen;
 	int len;
+	int repl;
 } EditorState;
 
 int append_end(EditorState *state, char c) {
@@ -58,6 +60,7 @@ char *readline(const char *prompt) {
 	state.buflen = INIT_BUF_SIZE;
 	state.len = 0;
 	state.buffer = malloc(state.buflen);
+	state.repl = 1;
 	if (!state.buffer) {
 		return NULL;
 	}
@@ -83,15 +86,31 @@ char *readline(const char *prompt) {
 			}
 
 			write(STDOUT_FILENO, &c, 1);
-		} else if (c == 3) { // ctrl+c
+		} else if (c == 3 && state.repl) { // ctrl+c
+			// this shouldn't be active for shell,
+			// but is useful for userspace apps
 			exit(0);
 		} else if (c == 4) {
 			if (state.len == 0) { // ctrl+d
 				free(state.buffer);
 				return NULL;
 			}
-		} else if (c == 26) { // ctrl+z
-			// TODO
+		} else if (c == 26 && state.repl) { // ctrl+z
+			// this shouldn't be active for shell,
+			// but is useful for userspace apps
+			disable_raw_mode();
+			signal(SIGTSTP, SIG_DFL);
+			// raise(SIGTSTP); ???
+			kill(0, SIGTSTP);
+
+			// --- waitin for user's `fg` ---
+			enable_raw_mode();
+			write(STDOUT_FILENO, "\n", 1);
+			write(STDOUT_FILENO, prompt, strlen(prompt));
+			if (state.len > 0) {
+				write(STDOUT_FILENO, state.buffer, state.len);
+			}
+
 		} else if (c == 1) { // ctrl+a
 		    	// TODO
 		} else if (c == 5) { // ctrl+e
