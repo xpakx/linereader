@@ -7,26 +7,35 @@
 struct termios orig_termios;
 
 void disable_raw_mode() {
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
+	tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
 }
 
 void enable_raw_mode() {
-    tcgetattr(STDIN_FILENO, &orig_termios);
-    atexit(disable_raw_mode); // restore settings on exit
-    struct termios raw = orig_termios;
-    raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
-    raw.c_iflag &= ~(IXON | ICRNL);
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
+	tcgetattr(STDIN_FILENO, &orig_termios);
+	atexit(disable_raw_mode); // restore settings on exit
+	struct termios raw = orig_termios;
+	raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
+	raw.c_iflag &= ~(IXON | ICRNL);
+	tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 }
 
+#define INIT_BUF_SIZE 128
+
+typedef struct {
+	char *buffer;
+	int buflen;
+	int len;
+} EditorState;
+
 char *readline(const char *prompt) {
-	int buflen = 128;
-	int len = 0;
-	char *buffer = malloc(buflen);
-	if (!buffer) {
+	EditorState state;
+	state.buflen = INIT_BUF_SIZE;
+	state.len = 0;
+	state.buffer = malloc(state.buflen);
+	if (!state.buffer) {
 		return NULL;
 	}
-	buffer[0] = '\0';
+	state.buffer[0] = '\0';
 
 	write(STDOUT_FILENO, prompt, strlen(prompt));
 
@@ -36,18 +45,18 @@ char *readline(const char *prompt) {
 			// enter
 			break;
 		} else if (c >= 32 && c < 127) {
-			if (len >= buflen - 1) {
+			if (state.len >= state.buflen - 1) {
 				// TODO: grow buffer
-				return buffer;
+				return state.buffer;
 			}
-			buffer[len++] = c;
-			buffer[len] = '\0';
+			state.buffer[state.len++] = c;
+			state.buffer[state.len] = '\0';
 			write(STDOUT_FILENO, &c, 1);
 		}
 	}
 
 
-	return buffer;
+	return state.buffer;
 }
 
 int main() {
