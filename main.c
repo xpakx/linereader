@@ -72,6 +72,10 @@ char *readline(const char *prompt) {
 			break;
 		} else if (c == 127 || c == 8) {
 			if (backspace(&state)) write(STDOUT_FILENO, "\b \b", 3);
+		} else if (c == '\033') {
+			char seq[3];
+			if (read(STDIN_FILENO, &seq[0], 1) != 1) continue;
+			if (read(STDIN_FILENO, &seq[1], 1) != 1) continue;
 		} else if (c >= 32 && c < 127) {
 			if (!append_end(&state, c)) {
 				return NULL;
