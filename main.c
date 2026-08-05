@@ -78,10 +78,30 @@ char *readline(const char *prompt) {
 			if (read(STDIN_FILENO, &seq[1], 1) != 1) continue;
 		} else if (c >= 32 && c < 127) {
 			if (!append_end(&state, c)) {
+				free(state.buffer);
 				return NULL;
 			}
 
 			write(STDOUT_FILENO, &c, 1);
+		} else if (c == 3) { // ctrl+c
+			exit(0);
+		} else if (c == 4) {
+			if (state.len == 0) { // ctrl+d
+				free(state.buffer);
+				return NULL;
+			}
+		} else if (c == 26) { // ctrl+z
+			// TODO
+		} else if (c == 1) { // ctrl+a
+		    	// TODO
+		} else if (c == 5) { // ctrl+e
+		    	// TODO
+		} else if (c == 11) { // ctrl+k
+		    	// TODO
+		} else if (c == 21) { // ctrl+u
+		    	// TODO
+		} else if (c == 23) { // ctrl+w
+		    	// TODO
 		}
 	}
 
