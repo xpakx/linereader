@@ -27,6 +27,23 @@ typedef struct {
 	int len;
 } EditorState;
 
+int append_end(EditorState *state, char c) {
+	if (state->len >= state->buflen - 1) {
+		state->buflen *= 2;
+		char *new_buffer = realloc(state->buffer, state->buflen);
+		if (!new_buffer) {
+			free(state->buffer);
+			return 1;
+		}
+		state->buffer = new_buffer;
+	}
+
+	state->buffer[state->len++] = c;
+	state->buffer[state->len] = '\0';
+	return 0;
+}
+
+
 char *readline(const char *prompt) {
 	EditorState state;
 	state.buflen = INIT_BUF_SIZE;
@@ -45,12 +62,11 @@ char *readline(const char *prompt) {
 			// enter
 			break;
 		} else if (c >= 32 && c < 127) {
-			if (state.len >= state.buflen - 1) {
-				// TODO: grow buffer
-				return state.buffer;
+			int res = append_end(&state, c);
+			if (res > 0) {
+				return NULL;
 			}
-			state.buffer[state.len++] = c;
-			state.buffer[state.len] = '\0';
+
 			write(STDOUT_FILENO, &c, 1);
 		}
 	}
@@ -62,6 +78,7 @@ char *readline(const char *prompt) {
 int main() {
 	enable_raw_mode();
 	char *line = readline("prompt> ");
+
 	if (line) {
 		printf("\n\n%s\n", line);
 		free(line);
