@@ -69,7 +69,7 @@ char *readline(const char *prompt) {
 	write(STDOUT_FILENO, prompt, strlen(prompt));
 
 	char c;
-	while (read(STDOUT_FILENO, &c, 1) == 1) {
+	while (read(STDIN_FILENO, &c, 1) == 1) {
 		if (c == '\n' || c == '\r') {
 			// enter
 			break;
