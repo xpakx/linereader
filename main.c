@@ -4,6 +4,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
+#include <poll.h>
 
 struct termios orig_termios;
 
@@ -76,9 +77,33 @@ char *readline(const char *prompt) {
 		} else if (c == 127 || c == 8) {
 			if (backspace(&state)) write(STDOUT_FILENO, "\b \b", 3);
 		} else if (c == '\033') {
+			struct pollfd pfd = { .fd = STDIN_FILENO, .events = POLLIN };
+			if (poll(&pfd, 1, 50) <= 0) {
+				continue; 
+			}
+
 			char seq[3];
 			if (read(STDIN_FILENO, &seq[0], 1) != 1) continue;
 			if (read(STDIN_FILENO, &seq[1], 1) != 1) continue;
+
+			if (seq[0] == '[') {
+				if (seq[1] == 'D') {
+					// Left arrow
+					// TODO
+					write(STDOUT_FILENO, "<=", 2);
+				} else if (seq[1] == 'C') {
+					// Right arrow
+					// TODO
+					write(STDOUT_FILENO, "=>", 2);
+				} else if (seq[1] == 'A') {
+					// Up arrow (History prev)
+					// TODO
+				} else if (seq[1] == 'B') {
+					// Down arrow (History next)
+					// TODO
+				}
+			}
+
 		} else if (c >= 32 && c < 127) {
 			if (!append_end(&state, c)) {
 				return NULL;
