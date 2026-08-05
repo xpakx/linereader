@@ -81,7 +81,6 @@ char *readline(const char *prompt) {
 			if (read(STDIN_FILENO, &seq[1], 1) != 1) continue;
 		} else if (c >= 32 && c < 127) {
 			if (!append_end(&state, c)) {
-				free(state.buffer);
 				return NULL;
 			}
 
