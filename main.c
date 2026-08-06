@@ -212,7 +212,9 @@ char *readline(const char *prompt) {
 		} else if (c == 5) { // ctrl+e
 		    	// TODO
 		} else if (c == 11) { // ctrl+k
-		    	// TODO
+			state.buffer[state.cursor] = '\0';
+			state.len = state.cursor;
+			write(STDOUT_FILENO, "\033[K", 3);
 		} else if (c == 21) { // ctrl+u
 		    	// TODO
 		} else if (c == 23) { // ctrl+w
