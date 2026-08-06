@@ -48,6 +48,35 @@ int append_end(EditorState *state, char c) {
 	return 1;
 }
 
+int append_middle(EditorState *state, char c) {
+	if (state->len >= state->buflen - 1) {
+		state->buflen *= 2;
+		char *new_buffer = realloc(state->buffer, state->buflen);
+		if (!new_buffer) {
+			free(state->buffer);
+			return 0;
+		}
+		state->buffer = new_buffer;
+	}
+
+
+	for(int i=state->len; i>state->cursor; i--) {
+		state->buffer[i] = state->buffer[i-1];
+	}
+	state->buffer[state->cursor++] = c;
+	state->len++;
+	state->buffer[state->len] = '\0';
+	return 2;
+}
+
+
+int append(EditorState *state, char c) {
+	if (state->cursor == state->len) {
+		return append_end(state, c);
+	}
+	return append_middle(state, c);
+}
+
 int backspace_end(EditorState *state) {
 	if (state->len > 0) {
 		state->len--;
@@ -140,11 +169,19 @@ char *readline(const char *prompt) {
 			}
 
 		} else if (c >= 32 && c < 127) {
-			if (!append_end(&state, c)) {
+			int res = append(&state, c);
+			if (!res) {
 				return NULL;
 			}
-
-			write(STDOUT_FILENO, &c, 1);
+			if (res==2) {
+				write(STDOUT_FILENO, &c, 1);
+				write(STDOUT_FILENO, &state.buffer[state.cursor], state.len - state.cursor);
+				char jumpbuf[16];
+				int len = snprintf(jumpbuf, sizeof(jumpbuf), "\033[%dD", state.len-state.cursor);
+				write(STDOUT_FILENO, jumpbuf, len);
+			} else {
+				write(STDOUT_FILENO, &c, 1);
+			}
 		} else if (c == 3 && state.repl) { // ctrl+c
 			// this shouldn't be active for shell,
 			// but is useful for userspace apps
