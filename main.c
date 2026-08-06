@@ -48,7 +48,7 @@ int append_end(EditorState *state, char c) {
 	return 1;
 }
 
-int backspace(EditorState *state) {
+int backspace_end(EditorState *state) {
 	if (state->len > 0) {
 		state->len--;
 		state->cursor--;
@@ -56,6 +56,24 @@ int backspace(EditorState *state) {
 		return 1;
 	}
 	return 0;
+}
+
+int backspace_middle(EditorState *state) {
+	if (state->cursor == 0) return 0;
+	state->len--;
+	for(int i=state->cursor-1; i<state->len; i++) {
+		state->buffer[i] = state->buffer[i+1];
+	}
+	state->cursor--;
+	state->buffer[state->len] = '\0';
+	return 2;
+}
+
+int backspace(EditorState *state) {
+	if (state->cursor == state->len) {
+		return backspace_end(state);
+	}
+	return backspace_middle(state);
 }
 
 
@@ -79,7 +97,16 @@ char *readline(const char *prompt) {
 			// enter
 			break;
 		} else if (c == 127 || c == 8) {
-			if (backspace(&state)) write(STDOUT_FILENO, "\b \b", 3);
+			int res = backspace(&state);
+			if (res == 1) write(STDOUT_FILENO, "\b \b", 3);
+			else if (res == 2) {
+				write(STDOUT_FILENO, "\b", 1);
+				write(STDOUT_FILENO, &state.buffer[state.cursor], state.len - state.cursor);
+				write(STDOUT_FILENO, " ", 1);
+				char jumpbuf[16];
+				int len = snprintf(jumpbuf, sizeof(jumpbuf), "\033[%dD", state.len-state.cursor+1);
+				write(STDOUT_FILENO, jumpbuf, len);
+			}
 		} else if (c == '\033') {
 			struct pollfd pfd = { .fd = STDIN_FILENO, .events = POLLIN };
 			if (poll(&pfd, 1, 50) <= 0) {
