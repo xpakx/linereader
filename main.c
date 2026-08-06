@@ -208,9 +208,21 @@ char *readline(const char *prompt) {
 			}
 
 		} else if (c == 1) { // ctrl+a
-		    	// TODO
+			int jump = state.cursor;
+			if (!jump) continue;
+			state.cursor = 0;
+
+			char jumpbuf[16];
+			int len = snprintf(jumpbuf, sizeof(jumpbuf), "\033[%dD", jump);
+			write(STDOUT_FILENO, jumpbuf, len);
 		} else if (c == 5) { // ctrl+e
-		    	// TODO
+			int jump = state.len - state.cursor;
+			if (!jump) continue;
+			state.cursor = state.len;
+
+			char jumpbuf[16];
+			int len = snprintf(jumpbuf, sizeof(jumpbuf), "\033[%dC", jump);
+			write(STDOUT_FILENO, jumpbuf, len);
 		} else if (c == 11) { // ctrl+k
 			state.buffer[state.cursor] = '\0';
 			state.len = state.cursor;
