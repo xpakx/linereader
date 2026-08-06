@@ -27,6 +27,7 @@ typedef struct {
 	char *buffer;
 	int buflen;
 	int len;
+	int cursor;
 	int repl;
 } EditorState;
 
@@ -43,12 +44,14 @@ int append_end(EditorState *state, char c) {
 
 	state->buffer[state->len++] = c;
 	state->buffer[state->len] = '\0';
+	state->cursor++;
 	return 1;
 }
 
 int backspace(EditorState *state) {
 	if (state->len > 0) {
 		state->len--;
+		state->cursor--;
 		state->buffer[state->len] = '\0';
 		return 1;
 	}
@@ -60,6 +63,7 @@ char *readline(const char *prompt) {
 	EditorState state;
 	state.buflen = INIT_BUF_SIZE;
 	state.len = 0;
+	state.cursor = 0;
 	state.buffer = malloc(state.buflen);
 	state.repl = 1;
 	if (!state.buffer) {
@@ -89,12 +93,16 @@ char *readline(const char *prompt) {
 			if (seq[0] == '[') {
 				if (seq[1] == 'D') {
 					// Left arrow
-					// TODO
-					write(STDOUT_FILENO, "<=", 2);
+					if (state.cursor > 0) {
+						state.cursor--;
+						write(STDOUT_FILENO, "\b", 1);
+					}
 				} else if (seq[1] == 'C') {
 					// Right arrow
-					// TODO
-					write(STDOUT_FILENO, "=>", 2);
+					if (state.cursor < state.len) {
+						state.cursor++;
+						write(STDOUT_FILENO, "\033[C", 3);
+					}
 				} else if (seq[1] == 'A') {
 					// Up arrow (History prev)
 					// TODO
