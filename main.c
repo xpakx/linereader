@@ -216,7 +216,17 @@ char *readline(const char *prompt) {
 			state.len = state.cursor;
 			write(STDOUT_FILENO, "\033[K", 3);
 		} else if (c == 21) { // ctrl+u
-		    	// TODO
+			int jump = state.cursor;
+			state.buffer[0] = '\0';
+			state.len = 0;
+			state.cursor = 0;
+
+			if (jump) {
+				char jumpbuf[16];
+				int len = snprintf(jumpbuf, sizeof(jumpbuf), "\033[%dD", jump);
+				write(STDOUT_FILENO, jumpbuf, len);
+			}
+			write(STDOUT_FILENO, "\033[K", 3);
 		} else if (c == 23) { // ctrl+w
 		    	// TODO
 		}
