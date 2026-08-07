@@ -169,22 +169,32 @@ void move_right_visual(EditorState *state) {
 
 
 int backspace_end(EditorState *state) {
-	if (state->len > 0) {
-		state->len--;
+	if (state->len <= 0) return 0;
+	state->len--;
+	state->cursor--;
+
+	while (state->cursor > 0 && (state->buffer[state->cursor] & 0xC0) == 0x80) {
 		state->cursor--;
-		state->buffer[state->len] = '\0';
-		return 1;
+		state->len--;
 	}
-	return 0;
+
+	state->buffer[state->len] = '\0';
+	return 1;
 }
 
 int backspace_middle(EditorState *state) {
 	if (state->cursor == 0) return 0;
+	int len = 1;
 	state->len--;
-	for(int i=state->cursor-1; i<state->len; i++) {
-		state->buffer[i] = state->buffer[i+1];
-	}
 	state->cursor--;
+	while (state->cursor > 0 && (state->buffer[state->cursor] & 0xC0) == 0x80) {
+		state->cursor--;
+		state->len--;
+		len++;
+	}
+	for(int i=state->cursor; i<state->len; i++) {
+		state->buffer[i] = state->buffer[i+len];
+	}
 	state->buffer[state->len] = '\0';
 	return 2;
 }
@@ -219,7 +229,7 @@ char *readline(const char *prompt) {
 			// enter
 			break;
 		} else if (c == 127 || c == 8) {
-			// TODO: multibyte
+			// TODO: multibyte (2-col chars)
 			int res = backspace(&state);
 			if (res == 1) write(STDOUT_FILENO, "\b \b", 3);
 			else if (res == 2) {
@@ -227,7 +237,7 @@ char *readline(const char *prompt) {
 				write(STDOUT_FILENO, &state.buffer[state.cursor], state.len - state.cursor);
 				write(STDOUT_FILENO, " ", 1);
 				char jumpbuf[16];
-				int len = snprintf(jumpbuf, sizeof(jumpbuf), "\033[%dD", state.len-state.cursor+1);
+				int len = snprintf(jumpbuf, sizeof(jumpbuf), "\033[%dD", state.vislen-state.viscursor+1);
 				write(STDOUT_FILENO, jumpbuf, len);
 			}
 		} else if (c == '\033') {
