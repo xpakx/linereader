@@ -28,7 +28,9 @@ typedef struct {
 	int buflen;
 	int len;
 	int cursor;
+
 	int repl;
+	int multibyte;  // temporary flag, bc some operations are bugged after introducing multibyte utf-8
 } EditorState;
 
 int append_end(EditorState *state, char c) {
@@ -105,7 +107,6 @@ int backspace(EditorState *state) {
 	return backspace_middle(state);
 }
 
-
 char *readline(const char *prompt) {
 	EditorState state;
 	state.buflen = INIT_BUF_SIZE;
@@ -113,6 +114,7 @@ char *readline(const char *prompt) {
 	state.cursor = 0;
 	state.buffer = malloc(state.buflen);
 	state.repl = 1;
+	state.multibyte = 1;
 	if (!state.buffer) {
 		return NULL;
 	}
@@ -168,7 +170,7 @@ char *readline(const char *prompt) {
 				}
 			}
 
-		} else if (c >= 32 && c < 127) {
+		} else if (c >= 32 && c < 127 || (state.multibyte && (unsigned char)c >= 128)) {
 			int res = append(&state, c);
 			if (!res) {
 				return NULL;
