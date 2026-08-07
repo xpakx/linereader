@@ -104,8 +104,11 @@ void append_visual(EditorState *state, char c) {
 		if (state->multilen == state->multipred) {
 			write(STDOUT_FILENO, state->multibuffer, state->multilen);
 			state->multipred = 0;
-			state->viscursor++;
-			state->vislen++;
+			// TODO: some 3-byte chars are also 2 col wide
+			// this also ignores zero-width chars, etc
+			int width = (state->multilen == 4) ? 2 : 1;
+			state->viscursor += width;
+			state->vislen += width;
 		} else {
 			return;
 		}
@@ -129,9 +132,39 @@ void move_left(EditorState *state) {
 
 void move_left_visual(EditorState *state) {
 	if (state->viscursor <= 0) return;
-	// TODO: two spaces for emoji
+	
+	// TODO: some 3-byte chars are also 2 col wide
+	// this also ignores zero-width chars, etc
+	if ((state->buffer[state->cursor] & 0xF8) == 0xF0) {
+		state->viscursor -= 2;
+		write(STDOUT_FILENO, "\b\b", 2);
+		return;
+	}
 	state->viscursor--;
 	write(STDOUT_FILENO, "\b", 1);
+}
+
+void move_right(EditorState *state) {
+	if (state->cursor >= state->len) return;
+	state->cursor++;
+
+	while (state->cursor < state->len && (state->buffer[state->cursor] & 0xC0) == 0x80) {
+		state->cursor++;
+	}
+}
+
+void move_right_visual(EditorState *state) {
+	if (state->viscursor >= state->vislen) return;
+	
+	// TODO: some 3-byte chars are also 2 col wide
+	// this also ignores zero-width chars, etc
+	if ((state->buffer[state->cursor] & 0xF8) == 0xF0) {
+		state->viscursor += 2;
+		write(STDOUT_FILENO, "\033[2C", 4);
+		return;
+	}
+	state->viscursor++;
+	write(STDOUT_FILENO, "\033[C", 3);
 }
 
 
@@ -213,10 +246,8 @@ char *readline(const char *prompt) {
 					move_left_visual(&state);
 				} else if (seq[1] == 'C') {
 					// Right arrow
-					if (state.cursor < state.len) {
-						state.cursor++;
-						write(STDOUT_FILENO, "\033[C", 3);
-					}
+					move_right(&state);
+					move_right_visual(&state);
 				} else if (seq[1] == 'A') {
 					// Up arrow (History prev)
 					// TODO
