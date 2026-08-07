@@ -35,6 +35,8 @@ typedef struct {
 	char multibuffer[4];
 	char multilen;
 	char multipred;
+	int viscursor;
+	int vislen;
 } EditorState;
 
 int grow_buffer(EditorState *state) {
@@ -78,6 +80,8 @@ int append(EditorState *state, char c) {
 void append_visual(EditorState *state, char c) {
 	if (c >= 32 && c < 127) {
 		write(STDOUT_FILENO, &c, 1);
+		state->viscursor++;
+		state->vislen++;
 	}
 	if ((c & 0xE0) == 0xC0) {
 		state->multipred = 2;
@@ -100,6 +104,8 @@ void append_visual(EditorState *state, char c) {
 		if (state->multilen == state->multipred) {
 			write(STDOUT_FILENO, state->multibuffer, state->multilen);
 			state->multipred = 0;
+			state->viscursor++;
+			state->vislen++;
 		} else {
 			return;
 		}
@@ -107,9 +113,25 @@ void append_visual(EditorState *state, char c) {
 	if (state->cursor != state->len) {
 		write(STDOUT_FILENO, &state->buffer[state->cursor], state->len - state->cursor);
 		char jumpbuf[16];
-		int len = snprintf(jumpbuf, sizeof(jumpbuf), "\033[%dD", state->len-state->cursor);
+		int len = snprintf(jumpbuf, sizeof(jumpbuf), "\033[%dD", state->vislen-state->viscursor);
 		write(STDOUT_FILENO, jumpbuf, len);
 	}
+}
+
+void move_left(EditorState *state) {
+	if (state->cursor <= 0) return;
+	state->cursor--;
+
+	while (state->cursor > 0 && (state->buffer[state->cursor] & 0xC0) == 0x80) {
+		state->cursor--;
+	}
+}
+
+void move_left_visual(EditorState *state) {
+	if (state->viscursor <= 0) return;
+	// TODO: two spaces for emoji
+	state->viscursor--;
+	write(STDOUT_FILENO, "\b", 1);
 }
 
 
@@ -146,6 +168,8 @@ char *readline(const char *prompt) {
 	state.buflen = INIT_BUF_SIZE;
 	state.len = 0;
 	state.cursor = 0;
+	state.vislen = 0;
+	state.viscursor = 0;
 	state.buffer = malloc(state.buflen);
 	state.repl = 1;
 	state.multibyte = 1;
@@ -185,10 +209,8 @@ char *readline(const char *prompt) {
 			if (seq[0] == '[') {
 				if (seq[1] == 'D') {
 					// Left arrow
-					if (state.cursor > 0) {
-						state.cursor--;
-						write(STDOUT_FILENO, "\b", 1);
-					}
+					move_left(&state);
+					move_left_visual(&state);
 				} else if (seq[1] == 'C') {
 					// Right arrow
 					if (state.cursor < state.len) {
