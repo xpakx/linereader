@@ -313,12 +313,12 @@ char *readline(const char *prompt) {
 			state.vislen = state.viscursor;
 			write(STDOUT_FILENO, "\033[K", 3);
 		} else if (c == 21) { // ctrl+u
-			// TODO: multibyte
-			state.buffer[state.cursor] = '\0';
-			int jump = state.cursor;
+			int jump = state.viscursor;
 			state.buffer[0] = '\0';
 			state.len = 0;
 			state.cursor = 0;
+			state.vislen = 0;
+			state.viscursor = 0;
 
 			if (jump) {
 				char jumpbuf[16];
