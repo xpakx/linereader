@@ -1,3 +1,5 @@
+#define _XOPEN_SOURCE
+
 #include <stdio.h>
 #include <termios.h>
 #include <stdlib.h>
@@ -5,6 +7,11 @@
 #include <unistd.h>
 #include <signal.h>
 #include <poll.h>
+
+#include <wchar.h>
+#include <locale.h>
+
+int wcwidth(wchar_t wc);
 
 struct termios orig_termios;
 
@@ -30,7 +37,10 @@ typedef struct {
 	int cursor;
 
 	int repl;
-	int multibyte;  // temporary flag, bc some operations are bugged after introducing multibyte utf-8
+
+	// TODO: only implemented for append
+	// temporary flag, bc some operations are bugged
+	int multibyte_unsafe_width;
 
 	char multibuffer[4];
 	char multilen;
@@ -38,6 +48,20 @@ typedef struct {
 	int viscursor;
 	int vislen;
 } EditorState;
+
+
+int check_multibuffer_width(char buffer[4], int len) {
+	wchar_t wc;
+	mbstate_t ps = {0};
+	size_t res = mbrtowc(&wc, buffer, len, &ps);
+
+	if (res != (size_t)-1 && res != (size_t)-2) {
+		int w = wcwidth(wc);
+
+		return (w >= 0) ? w : 0; 
+	}
+	return 1;
+}
 
 int grow_buffer(EditorState *state) {
 	if (state->len >= state->buflen - 1) {
@@ -106,7 +130,12 @@ void append_visual(EditorState *state, char c) {
 			state->multipred = 0;
 			// TODO: some 3-byte chars are also 2 col wide
 			// this also ignores zero-width chars, etc
-			int width = (state->multilen == 4) ? 2 : 1;
+			int width;
+			if (state->multibyte_unsafe_width) {
+				width = check_multibuffer_width(state->multibuffer, state->multilen);
+			} else {
+				width = (state->multilen == 4) ? 2 : 1;
+			}
 			state->viscursor += width;
 			state->vislen += width;
 		} else {
@@ -215,7 +244,7 @@ char *readline(const char *prompt) {
 	state.viscursor = 0;
 	state.buffer = malloc(state.buflen);
 	state.repl = 1;
-	state.multibyte = 1;
+	state.multibyte_unsafe_width = 1;
 	if (!state.buffer) {
 		return NULL;
 	}
@@ -273,7 +302,7 @@ char *readline(const char *prompt) {
 				}
 			}
 
-		} else if (c >= 32 && c < 127 || (state.multibyte && (unsigned char)c >= 128)) {
+		} else if (c >= 32 && c < 127 || (unsigned char)c >= 128) {
 			if(!append(&state, c))  {
 				return NULL;
 			}
@@ -350,6 +379,7 @@ char *readline(const char *prompt) {
 }
 
 int main() {
+	setlocale(LC_ALL, "");
 	enable_raw_mode();
 	char *line = readline("prompt> ");
 
@@ -357,5 +387,6 @@ int main() {
 		printf("\n\n%s\n", line);
 		free(line);
 	}
+
 	return 0;
 }
