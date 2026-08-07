@@ -219,6 +219,7 @@ char *readline(const char *prompt) {
 			// enter
 			break;
 		} else if (c == 127 || c == 8) {
+			// TODO: multibyte
 			int res = backspace(&state);
 			if (res == 1) write(STDOUT_FILENO, "\b \b", 3);
 			else if (res == 2) {
@@ -289,17 +290,19 @@ char *readline(const char *prompt) {
 			}
 
 		} else if (c == 1) { // ctrl+a
-			int jump = state.cursor;
+			int jump = state.viscursor;
 			if (!jump) continue;
 			state.cursor = 0;
+			state.viscursor = 0;
 
 			char jumpbuf[16];
 			int len = snprintf(jumpbuf, sizeof(jumpbuf), "\033[%dD", jump);
 			write(STDOUT_FILENO, jumpbuf, len);
 		} else if (c == 5) { // ctrl+e
-			int jump = state.len - state.cursor;
+			int jump = state.vislen - state.viscursor;
 			if (!jump) continue;
 			state.cursor = state.len;
+			state.viscursor = state.vislen;
 
 			char jumpbuf[16];
 			int len = snprintf(jumpbuf, sizeof(jumpbuf), "\033[%dC", jump);
@@ -307,8 +310,11 @@ char *readline(const char *prompt) {
 		} else if (c == 11) { // ctrl+k
 			state.buffer[state.cursor] = '\0';
 			state.len = state.cursor;
+			state.vislen = state.viscursor;
 			write(STDOUT_FILENO, "\033[K", 3);
 		} else if (c == 21) { // ctrl+u
+			// TODO: multibyte
+			state.buffer[state.cursor] = '\0';
 			int jump = state.cursor;
 			state.buffer[0] = '\0';
 			state.len = 0;
