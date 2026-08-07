@@ -231,14 +231,19 @@ char *readline(const char *prompt) {
 		} else if (c == 127 || c == 8) {
 			// TODO: multibyte (2-col chars)
 			int res = backspace(&state);
-			if (res == 1) write(STDOUT_FILENO, "\b \b", 3);
-			else if (res == 2) {
+			if (res == 1) {
+				write(STDOUT_FILENO, "\b \b", 3);
+				state.viscursor--;
+				state.vislen--;
+			} else if (res == 2) {
 				write(STDOUT_FILENO, "\b", 1);
 				write(STDOUT_FILENO, &state.buffer[state.cursor], state.len - state.cursor);
 				write(STDOUT_FILENO, " ", 1);
 				char jumpbuf[16];
 				int len = snprintf(jumpbuf, sizeof(jumpbuf), "\033[%dD", state.vislen-state.viscursor+1);
 				write(STDOUT_FILENO, jumpbuf, len);
+				state.viscursor--;
+				state.vislen--;
 			}
 		} else if (c == '\033') {
 			struct pollfd pfd = { .fd = STDIN_FILENO, .events = POLLIN };
