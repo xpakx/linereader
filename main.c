@@ -31,9 +31,13 @@ typedef struct {
 
 	int repl;
 	int multibyte;  // temporary flag, bc some operations are bugged after introducing multibyte utf-8
+
+	char multibuffer[4];
+	char multilen;
+	char multipred;
 } EditorState;
 
-int append_end(EditorState *state, char c) {
+int grow_buffer(EditorState *state) {
 	if (state->len >= state->buflen - 1) {
 		state->buflen *= 2;
 		char *new_buffer = realloc(state->buffer, state->buflen);
@@ -43,7 +47,10 @@ int append_end(EditorState *state, char c) {
 		}
 		state->buffer = new_buffer;
 	}
+	return 1;
+}
 
+int append_end(EditorState *state, char c) {
 	state->buffer[state->len++] = c;
 	state->buffer[state->len] = '\0';
 	state->cursor++;
@@ -51,33 +58,60 @@ int append_end(EditorState *state, char c) {
 }
 
 int append_middle(EditorState *state, char c) {
-	if (state->len >= state->buflen - 1) {
-		state->buflen *= 2;
-		char *new_buffer = realloc(state->buffer, state->buflen);
-		if (!new_buffer) {
-			free(state->buffer);
-			return 0;
-		}
-		state->buffer = new_buffer;
-	}
-
-
 	for(int i=state->len; i>state->cursor; i--) {
 		state->buffer[i] = state->buffer[i-1];
 	}
 	state->buffer[state->cursor++] = c;
 	state->len++;
 	state->buffer[state->len] = '\0';
-	return 2;
+	return 1;
 }
 
-
 int append(EditorState *state, char c) {
+	if (!grow_buffer(state)) return 0;
 	if (state->cursor == state->len) {
 		return append_end(state, c);
 	}
 	return append_middle(state, c);
 }
+
+void append_visual(EditorState *state, char c) {
+	if (c >= 32 && c < 127) {
+		write(STDOUT_FILENO, &c, 1);
+	}
+	if ((c & 0xE0) == 0xC0) {
+		state->multipred = 2;
+		state->multilen = 0;
+		state->multibuffer[state->multilen++] = c;
+		return;
+	} else if ((c & 0xF0) == 0xE0) {
+		state->multipred = 3;
+		state->multilen = 0;
+		state->multibuffer[state->multilen++] = c;
+		return;
+	} else if ((c & 0xF8) == 0xF0) {
+		state->multipred = 4;
+		state->multilen = 0;
+		state->multibuffer[state->multilen++] = c;
+		return;
+	} else if ((c & 0xC0) == 0x80) {
+		if (!state->multipred) return;
+		state->multibuffer[state->multilen++] = c;
+		if (state->multilen == state->multipred) {
+			write(STDOUT_FILENO, state->multibuffer, state->multilen);
+			state->multipred = 0;
+		} else {
+			return;
+		}
+	}
+	if (state->cursor != state->len) {
+		write(STDOUT_FILENO, &state->buffer[state->cursor], state->len - state->cursor);
+		char jumpbuf[16];
+		int len = snprintf(jumpbuf, sizeof(jumpbuf), "\033[%dD", state->len-state->cursor);
+		write(STDOUT_FILENO, jumpbuf, len);
+	}
+}
+
 
 int backspace_end(EditorState *state) {
 	if (state->len > 0) {
@@ -171,22 +205,14 @@ char *readline(const char *prompt) {
 			}
 
 		} else if (c >= 32 && c < 127 || (state.multibyte && (unsigned char)c >= 128)) {
-			int res = append(&state, c);
-			if (!res) {
+			if(!append(&state, c))  {
 				return NULL;
 			}
-			if (res==2) {
-				write(STDOUT_FILENO, &c, 1);
-				write(STDOUT_FILENO, &state.buffer[state.cursor], state.len - state.cursor);
-				char jumpbuf[16];
-				int len = snprintf(jumpbuf, sizeof(jumpbuf), "\033[%dD", state.len-state.cursor);
-				write(STDOUT_FILENO, jumpbuf, len);
-			} else {
-				write(STDOUT_FILENO, &c, 1);
-			}
+			append_visual(&state, c);
 		} else if (c == 3 && state.repl) { // ctrl+c
 			// this shouldn't be active for shell,
 			// but is useful for userspace apps
+			free(state.buffer);
 			exit(0);
 		} else if (c == 4) {
 			if (state.len == 0) { // ctrl+d
@@ -245,7 +271,6 @@ char *readline(const char *prompt) {
 		    	// TODO
 		}
 	}
-
 
 	return state.buffer;
 }
