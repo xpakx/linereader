@@ -90,6 +90,20 @@ int check_curr_width(EditorState *state) {
 	return 1;
 }
 
+void visual_jump_left(EditorState *state, int steps) {
+	if (!steps) return;
+	char jumpbuf[16];
+	int len = snprintf(jumpbuf, sizeof(jumpbuf), "\033[%dD", steps);
+	write(STDOUT_FILENO, jumpbuf, len);
+}
+
+void visual_jump_right(EditorState *state, int steps) {
+	if (!steps) return;
+	char jumpbuf[16];
+	int len = snprintf(jumpbuf, sizeof(jumpbuf), "\033[%dC", steps);
+	write(STDOUT_FILENO, jumpbuf, len);
+}
+
 int grow_buffer(EditorState *state) {
 	if (state->len >= state->buflen - 1) {
 		state->buflen *= 2;
@@ -171,9 +185,7 @@ void append_visual(EditorState *state, char c) {
 	}
 	if (state->cursor != state->len) {
 		write(STDOUT_FILENO, &state->buffer[state->cursor], state->len - state->cursor);
-		char jumpbuf[16];
-		int len = snprintf(jumpbuf, sizeof(jumpbuf), "\033[%dD", state->vislen-state->viscursor);
-		write(STDOUT_FILENO, jumpbuf, len);
+		visual_jump_left(state, state->vislen - state->viscursor);
 	}
 }
 
@@ -201,9 +213,7 @@ void move_left_visual(EditorState *state, int width) {
 
 	if (width>1) {
 		state->viscursor -= width;
-		char jumpbuf[16];
-		int len = snprintf(jumpbuf, sizeof(jumpbuf), "\033[%dD", width);
-		write(STDOUT_FILENO, jumpbuf, len);
+		visual_jump_left(state, width);
 		return;
 	}
 
@@ -235,9 +245,7 @@ void move_right_visual(EditorState *state, int width) {
 
 	if (width>1) {
 		state->viscursor += width;
-		char jumpbuf[16];
-		int len = snprintf(jumpbuf, sizeof(jumpbuf), "\033[%dC", width);
-		write(STDOUT_FILENO, jumpbuf, len);
+		visual_jump_right(state, width);
 		return;
 	}
 	state->viscursor++;
@@ -289,19 +297,8 @@ void kill_to_end(EditorState *state) {
 	state->cursor = 0;
 }
 
-void jump_left(EditorState *state, int steps) {
-	if (!steps) return;
-	char jumpbuf[16];
-	int len = snprintf(jumpbuf, sizeof(jumpbuf), "\033[%dD", steps);
-	write(STDOUT_FILENO, jumpbuf, len);
-}
-
 void visual_kill_to_end(EditorState *state) {
-	if (state->viscursor) {
-		char jumpbuf[16];
-		int len = snprintf(jumpbuf, sizeof(jumpbuf), "\033[%dD", state->viscursor);
-		write(STDOUT_FILENO, jumpbuf, len);
-	}
+	visual_jump_left(state, state->viscursor);
 	write(STDOUT_FILENO, "\033[K", 3);
 	state->vislen = 0;
 	state->viscursor = 0;
@@ -412,18 +409,13 @@ char *readline(const char *prompt) {
 			state.cursor = 0;
 			state.viscursor = 0;
 
-			char jumpbuf[16];
-			int len = snprintf(jumpbuf, sizeof(jumpbuf), "\033[%dD", jump);
-			write(STDOUT_FILENO, jumpbuf, len);
+			visual_jump_left(&state, jump);
 		} else if (c == 5) { // ctrl+e
 			int jump = state.vislen - state.viscursor;
 			if (!jump) continue;
 			state.cursor = state.len;
 			state.viscursor = state.vislen;
-
-			char jumpbuf[16];
-			int len = snprintf(jumpbuf, sizeof(jumpbuf), "\033[%dC", jump);
-			write(STDOUT_FILENO, jumpbuf, len);
+			visual_jump_right(&state, jump);
 		} else if (c == 11) { // ctrl+k
 			state.buffer[state.cursor] = '\0';
 			state.len = state.cursor;
