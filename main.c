@@ -177,25 +177,26 @@ void append_visual(EditorState *state, char c) {
 	}
 }
 
-void move_left(EditorState *state) {
-	if (state->cursor <= 0) return;
+int move_left(EditorState *state) {
+	if (state->cursor <= 0) return 0;
 	state->cursor--;
 
 	while (state->cursor > 0 && (state->buffer[state->cursor] & 0xC0) == 0x80) {
 		state->cursor--;
 	}
+
+	return check_curr_width(state);
 }
 
-void move_left_visual(EditorState *state) {
+void move_left_visual(EditorState *state, int width) {
 	if (state->viscursor <= 0) return;
 	
-	int width;
-	if (state->multibyte_unsafe_width) {
-		width = check_curr_width(state);
-	} else if ((state->buffer[state->cursor] & 0xF8) == 0xF0) {
-		width = 2; 
-	} else {
-		width = 1;
+	if (!state->multibyte_unsafe_width) {
+		if ((state->buffer[state->cursor] & 0xF8) == 0xF0) {
+			width = 2; 
+		} else {
+			width = 1;
+		}
 	}
 
 	if (width>1) {
@@ -210,25 +211,26 @@ void move_left_visual(EditorState *state) {
 	write(STDOUT_FILENO, "\b", 1);
 }
 
-void move_right(EditorState *state) {
-	if (state->cursor >= state->len) return;
+int move_right(EditorState *state) {
+	if (state->cursor >= state->len) return 0;
+	int width = check_curr_width(state);
 	state->cursor++;
 
 	while (state->cursor < state->len && (state->buffer[state->cursor] & 0xC0) == 0x80) {
 		state->cursor++;
 	}
+	return width;
 }
 
-void move_right_visual(EditorState *state) {
+void move_right_visual(EditorState *state, int width) {
 	if (state->viscursor >= state->vislen) return;
 	
-	int width;
-	if (state->multibyte_unsafe_width) {
-		width = check_curr_width(state);
-	} else if ((state->buffer[state->cursor] & 0xF8) == 0xF0) {
-		width = 2; 
-	} else {
-		width = 1;
+	if (!state->multibyte_unsafe_width) {
+		if ((state->buffer[state->cursor] & 0xF8) == 0xF0) {
+			width = 2; 
+		} else {
+			width = 1;
+		}
 	}
 
 	if (width>1) {
@@ -334,12 +336,12 @@ char *readline(const char *prompt) {
 			if (seq[0] == '[') {
 				if (seq[1] == 'D') {
 					// Left arrow
-					move_left(&state);
-					move_left_visual(&state);
+					int w = move_left(&state);
+					move_left_visual(&state, w);
 				} else if (seq[1] == 'C') {
 					// Right arrow
-					move_right(&state);
-					move_right_visual(&state);
+					int w = move_right(&state);
+					move_right_visual(&state, w);
 				} else if (seq[1] == 'A') {
 					// Up arrow (History prev)
 					// TODO
