@@ -283,6 +283,30 @@ int backspace(EditorState *state) {
 	return backspace_middle(state);
 }
 
+void kill_to_end(EditorState *state) {
+	state->buffer[0] = '\0';
+	state->len = 0;
+	state->cursor = 0;
+}
+
+void jump_left(EditorState *state, int steps) {
+	if (!steps) return;
+	char jumpbuf[16];
+	int len = snprintf(jumpbuf, sizeof(jumpbuf), "\033[%dD", steps);
+	write(STDOUT_FILENO, jumpbuf, len);
+}
+
+void visual_kill_to_end(EditorState *state) {
+	if (state->viscursor) {
+		char jumpbuf[16];
+		int len = snprintf(jumpbuf, sizeof(jumpbuf), "\033[%dD", state->viscursor);
+		write(STDOUT_FILENO, jumpbuf, len);
+	}
+	write(STDOUT_FILENO, "\033[K", 3);
+	state->vislen = 0;
+	state->viscursor = 0;
+}
+
 char *readline(const char *prompt) {
 	EditorState state;
 	state.buflen = INIT_BUF_SIZE;
@@ -406,19 +430,8 @@ char *readline(const char *prompt) {
 			state.vislen = state.viscursor;
 			write(STDOUT_FILENO, "\033[K", 3);
 		} else if (c == 21) { // ctrl+u
-			int jump = state.viscursor;
-			state.buffer[0] = '\0';
-			state.len = 0;
-			state.cursor = 0;
-			state.vislen = 0;
-			state.viscursor = 0;
-
-			if (jump) {
-				char jumpbuf[16];
-				int len = snprintf(jumpbuf, sizeof(jumpbuf), "\033[%dD", jump);
-				write(STDOUT_FILENO, jumpbuf, len);
-			}
-			write(STDOUT_FILENO, "\033[K", 3);
+			kill_to_end(&state);
+			visual_kill_to_end(&state);
 		} else if (c == 23) { // ctrl+w
 		    	// TODO
 		}
