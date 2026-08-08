@@ -63,6 +63,33 @@ int check_multibuffer_width(char buffer[4], int len) {
 	return 1;
 }
 
+int check_curr_bytes(EditorState *state) {
+	char c = state->buffer[state->cursor];
+	if ((c & 0xE0) == 0xC0) {
+		return 2;
+	} else if ((c & 0xF0) == 0xE0) {
+		return 3;
+	} else if ((c & 0xF8) == 0xF0) {
+		return 4;
+	}
+	return 1;
+}
+
+int check_curr_width(EditorState *state) {
+	int len = check_curr_bytes(state);
+	int i = state->cursor;
+	wchar_t wc;
+	mbstate_t ps = {0};
+	size_t res = mbrtowc(&wc, state->buffer + i, len, &ps);
+
+	if (res != (size_t)-1 && res != (size_t)-2) {
+		int w = wcwidth(wc);
+
+		return (w >= 0) ? w : 0; 
+	}
+	return 1;
+}
+
 int grow_buffer(EditorState *state) {
 	if (state->len >= state->buflen - 1) {
 		state->buflen *= 2;
@@ -187,7 +214,7 @@ void move_right_visual(EditorState *state) {
 	
 	int width;
 	if (state->multibyte_unsafe_width) {
-		width = check_multibuffer_width(state->multibuffer, state->multilen);
+		width = check_curr_width(state);
 	} else if ((state->buffer[state->cursor] & 0xF8) == 0xF0) {
 		width = 2; 
 	} else {
