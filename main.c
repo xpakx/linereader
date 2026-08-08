@@ -185,11 +185,20 @@ void move_right(EditorState *state) {
 void move_right_visual(EditorState *state) {
 	if (state->viscursor >= state->vislen) return;
 	
-	// TODO: some 3-byte chars are also 2 col wide
-	// this also ignores zero-width chars, etc
-	if ((state->buffer[state->cursor] & 0xF8) == 0xF0) {
-		state->viscursor += 2;
-		write(STDOUT_FILENO, "\033[2C", 4);
+	int width;
+	if (state->multibyte_unsafe_width) {
+		width = check_multibuffer_width(state->multibuffer, state->multilen);
+	} else if ((state->buffer[state->cursor] & 0xF8) == 0xF0) {
+		width = 2; 
+	} else {
+		width = 1;
+	}
+
+	if (width>1) {
+		state->viscursor += width;
+		char jumpbuf[16];
+		int len = snprintf(jumpbuf, sizeof(jumpbuf), "\033[%dC", width);
+		write(STDOUT_FILENO, jumpbuf, len);
 		return;
 	}
 	state->viscursor++;
@@ -262,6 +271,7 @@ char *readline(const char *prompt) {
 			int res = backspace(&state);
 			if (res == 1) {
 				write(STDOUT_FILENO, "\b \b", 3);
+
 				state.viscursor--;
 				state.vislen--;
 			} else if (res == 2) {
