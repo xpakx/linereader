@@ -327,23 +327,30 @@ char *readline(const char *prompt) {
 			// enter
 			break;
 		} else if (c == 127 || c == 8) {
-			// TODO: multibyte (2-col chars)
-			int res = backspace(&state);
-			if (res == 1) {
-				write(STDOUT_FILENO, "\b \b", 3);
-
-				state.viscursor--;
-				state.vislen--;
-			} else if (res == 2) {
-				write(STDOUT_FILENO, "\b", 1);
-				write(STDOUT_FILENO, &state.buffer[state.cursor], state.len - state.cursor);
-				write(STDOUT_FILENO, " ", 1);
-				char jumpbuf[16];
-				int len = snprintf(jumpbuf, sizeof(jumpbuf), "\033[%dD", state.vislen-state.viscursor+1);
-				write(STDOUT_FILENO, jumpbuf, len);
-				state.viscursor--;
-				state.vislen--;
+			// TODO: we should simplify that
+			int width_del = 1; 
+			if (state.multibyte_unsafe_width) {
+				int moved = move_left(&state);
+				if (!moved) continue;
+				width_del = check_curr_width(&state);
+				move_right(&state);
+				if (!width_del) continue;
 			}
+			int res = backspace(&state);
+			if (res == 0) continue;
+			visual_jump_left(&state, width_del);
+			if (res == 1) {
+				for (int i = 0; i<width_del; i++) {
+					write(STDOUT_FILENO, " ", 1);
+				}
+				visual_jump_left(&state, width_del);
+			} else if (res == 2) {
+				write(STDOUT_FILENO, &state.buffer[state.cursor], state.len - state.cursor);
+				write(STDOUT_FILENO, "\033[K", 3);
+				visual_jump_left(&state, state.vislen - state.viscursor);
+			}
+			state.viscursor-=width_del;
+			state.vislen-=width_del;
 		} else if (c == '\033') {
 			struct pollfd pfd = { .fd = STDIN_FILENO, .events = POLLIN };
 			if (poll(&pfd, 1, 50) <= 0) {
