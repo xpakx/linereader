@@ -240,8 +240,9 @@ int backspace_end(EditorState *state) {
 		state->len--;
 	}
 
+	int width = check_curr_width(state);
 	state->buffer[state->len] = '\0';
-	return 1;
+	return width;
 }
 
 int backspace_middle(EditorState *state) {
@@ -254,11 +255,12 @@ int backspace_middle(EditorState *state) {
 		state->len--;
 		len++;
 	}
+	int width = check_curr_width(state);
 	for(int i=state->cursor; i<state->len; i++) {
 		state->buffer[i] = state->buffer[i+len];
 	}
 	state->buffer[state->len] = '\0';
-	return 2;
+	return width;
 }
 
 int backspace(EditorState *state) {
@@ -304,25 +306,13 @@ char *readline(const char *prompt) {
 			// enter
 			break;
 		} else if (c == 127 || c == 8) {
-			// TODO: we should simplify that
-			int width_del = 1; 
-
-			// TODO: add check_prev_width
-			int moved = move_left(&state);
-			if (!moved) continue;
-			width_del = check_curr_width(&state);
-			move_right(&state);
+			int width_del = backspace(&state);
 			if (!width_del) continue;
-
-			int res = backspace(&state);
-			if (res == 0) continue;
-			visual_jump_left(&state, width_del);
-			if (res == 1) {
-				for (int i = 0; i<width_del; i++) {
-					write(STDOUT_FILENO, " ", 1);
-				}
+			if (state.vislen == state.viscursor) {
 				visual_jump_left(&state, width_del);
-			} else if (res == 2) {
+				write(STDOUT_FILENO, "\033[K", 3);
+			} else {
+				visual_jump_left(&state, width_del);
 				write(STDOUT_FILENO, &state.buffer[state.cursor], state.len - state.cursor);
 				write(STDOUT_FILENO, "\033[K", 3);
 				visual_jump_left(&state, state.vislen - state.viscursor);
