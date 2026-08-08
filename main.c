@@ -38,9 +38,8 @@ typedef struct {
 
 	int repl;
 
-	// TODO: only implemented for append
-	// temporary flag, bc some operations are bugged
-	int multibyte_unsafe_width;
+	// TODO: temporary flag, bc some operations are bugged
+	int zerowidth_unsafe;
 
 	char multibuffer[4];
 	char multilen;
@@ -169,14 +168,8 @@ void append_visual(EditorState *state, char c) {
 		if (state->multilen == state->multipred) {
 			write(STDOUT_FILENO, state->multibuffer, state->multilen);
 			state->multipred = 0;
-			// TODO: some 3-byte chars are also 2 col wide
-			// this also ignores zero-width chars, etc
 			int width;
-			if (state->multibyte_unsafe_width) {
-				width = check_multibuffer_width(state->multibuffer, state->multilen);
-			} else {
-				width = (state->multilen == 4) ? 2 : 1;
-			}
+			width = check_multibuffer_width(state->multibuffer, state->multilen);
 			state->viscursor += width;
 			state->vislen += width;
 		} else {
@@ -203,14 +196,6 @@ int move_left(EditorState *state) {
 void move_left_visual(EditorState *state, int width) {
 	if (state->viscursor <= 0) return;
 	
-	if (!state->multibyte_unsafe_width) {
-		if ((state->buffer[state->cursor] & 0xF8) == 0xF0) {
-			width = 2; 
-		} else {
-			width = 1;
-		}
-	}
-
 	if (width>1) {
 		state->viscursor -= width;
 		visual_jump_left(state, width);
@@ -234,14 +219,6 @@ int move_right(EditorState *state) {
 
 void move_right_visual(EditorState *state, int width) {
 	if (state->viscursor >= state->vislen) return;
-	
-	if (!state->multibyte_unsafe_width) {
-		if ((state->buffer[state->cursor] & 0xF8) == 0xF0) {
-			width = 2; 
-		} else {
-			width = 1;
-		}
-	}
 
 	if (width>1) {
 		state->viscursor += width;
@@ -313,7 +290,7 @@ char *readline(const char *prompt) {
 	state.viscursor = 0;
 	state.buffer = malloc(state.buflen);
 	state.repl = 1;
-	state.multibyte_unsafe_width = 1;
+	state.zerowidth_unsafe = 1;
 	if (!state.buffer) {
 		return NULL;
 	}
@@ -329,13 +306,14 @@ char *readline(const char *prompt) {
 		} else if (c == 127 || c == 8) {
 			// TODO: we should simplify that
 			int width_del = 1; 
-			if (state.multibyte_unsafe_width) {
-				int moved = move_left(&state);
-				if (!moved) continue;
-				width_del = check_curr_width(&state);
-				move_right(&state);
-				if (!width_del) continue;
-			}
+
+			// TODO: add check_prev_width
+			int moved = move_left(&state);
+			if (!moved) continue;
+			width_del = check_curr_width(&state);
+			move_right(&state);
+			if (!width_del) continue;
+
 			int res = backspace(&state);
 			if (res == 0) continue;
 			visual_jump_left(&state, width_del);
