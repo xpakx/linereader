@@ -293,6 +293,26 @@ void visual_kill_to_end(EditorState *state) {
 	write(STDOUT_FILENO, "\033[K", 3);
 }
 
+void kill_to_start(EditorState *state) {
+	int len = 0;
+	for(int i=state->cursor; i<state->len; i++) {
+		state->buffer[len] = state->buffer[i];
+		len++;
+	}
+	state->buffer[len] = '\0';
+	state->len = len;
+	state->cursor = 0;
+}
+
+void visual_kill_to_start(EditorState *state) {
+	visual_jump_left(state, state->viscursor);
+	write(STDOUT_FILENO, "\033[K", 3);
+	write(STDOUT_FILENO, &state->buffer[0], state->len);
+	state->vislen = state->vislen - state->viscursor;
+	visual_jump_left(state, state->vislen);
+	state->viscursor = 0;
+}
+
 void jump_to_end(EditorState *state) {
 	state->cursor = state->len;
 }
@@ -420,8 +440,10 @@ char *readline(const char *prompt) {
 			kill_to_end(&state);
 			visual_kill_to_end(&state);
 		} else if (c == 21) { // ctrl+u
-			kill_line(&state);
-			visual_kill_line(&state);
+			//kill_line(&state);
+			//visual_kill_line(&state);
+			kill_to_start(&state);
+			visual_kill_to_start(&state);
 		} else if (c == 23) { // ctrl+w
 		    	// TODO
 		}
