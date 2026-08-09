@@ -283,6 +283,16 @@ void visual_kill_line(EditorState *state) {
 	state->viscursor = 0;
 }
 
+void kill_to_end(EditorState *state) {
+	state->buffer[state->cursor] = '\0';
+	state->len = state->cursor;
+}
+
+void visual_kill_to_end(EditorState *state) {
+	state->vislen = state->viscursor;
+	write(STDOUT_FILENO, "\033[K", 3);
+}
+
 char *readline(const char *prompt) {
 	EditorState state;
 	state.buflen = INIT_BUF_SIZE;
@@ -392,10 +402,8 @@ char *readline(const char *prompt) {
 			state.viscursor = state.vislen;
 			visual_jump_right(&state, jump);
 		} else if (c == 11) { // ctrl+k
-			state.buffer[state.cursor] = '\0';
-			state.len = state.cursor;
-			state.vislen = state.viscursor;
-			write(STDOUT_FILENO, "\033[K", 3);
+			kill_to_end(&state);
+			visual_kill_to_end(&state);
 		} else if (c == 21) { // ctrl+u
 			kill_line(&state);
 			visual_kill_line(&state);
