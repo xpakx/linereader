@@ -293,6 +293,28 @@ void visual_kill_to_end(EditorState *state) {
 	write(STDOUT_FILENO, "\033[K", 3);
 }
 
+void jump_to_end(EditorState *state) {
+	state->cursor = state->len;
+}
+
+void visual_jump_to_end(EditorState *state) {
+	int jump = state->vislen - state->viscursor;
+	if (!jump) return;
+	state->viscursor = state->vislen;
+	visual_jump_right(state, jump);
+}
+
+void jump_to_start(EditorState *state) {
+	state->cursor = 0;
+}
+
+void visual_jump_to_start(EditorState *state) {
+	int jump = state->viscursor;
+	if (!jump) return;
+	state->viscursor = 0;
+	visual_jump_left(state, jump);
+}
+
 char *readline(const char *prompt) {
 	EditorState state;
 	state.buflen = INIT_BUF_SIZE;
@@ -389,18 +411,11 @@ char *readline(const char *prompt) {
 			}
 
 		} else if (c == 1) { // ctrl+a
-			int jump = state.viscursor;
-			if (!jump) continue;
-			state.cursor = 0;
-			state.viscursor = 0;
-
-			visual_jump_left(&state, jump);
+			jump_to_start(&state);
+			visual_jump_to_start(&state);
 		} else if (c == 5) { // ctrl+e
-			int jump = state.vislen - state.viscursor;
-			if (!jump) continue;
-			state.cursor = state.len;
-			state.viscursor = state.vislen;
-			visual_jump_right(&state, jump);
+			jump_to_end(&state);
+			visual_jump_to_end(&state);
 		} else if (c == 11) { // ctrl+k
 			kill_to_end(&state);
 			visual_kill_to_end(&state);
