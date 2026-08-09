@@ -270,13 +270,13 @@ int backspace(EditorState *state) {
 	return backspace_middle(state);
 }
 
-void kill_to_end(EditorState *state) {
+void kill_line(EditorState *state) {
 	state->buffer[0] = '\0';
 	state->len = 0;
 	state->cursor = 0;
 }
 
-void visual_kill_to_end(EditorState *state) {
+void visual_kill_line(EditorState *state) {
 	visual_jump_left(state, state->viscursor);
 	write(STDOUT_FILENO, "\033[K", 3);
 	state->vislen = 0;
@@ -397,8 +397,8 @@ char *readline(const char *prompt) {
 			state.vislen = state.viscursor;
 			write(STDOUT_FILENO, "\033[K", 3);
 		} else if (c == 21) { // ctrl+u
-			kill_to_end(&state);
-			visual_kill_to_end(&state);
+			kill_line(&state);
+			visual_kill_line(&state);
 		} else if (c == 23) { // ctrl+w
 		    	// TODO
 		}
