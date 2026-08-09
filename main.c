@@ -335,6 +335,20 @@ void visual_jump_to_start(EditorState *state) {
 	visual_jump_left(state, jump);
 }
 
+typedef char* (*completion_callback_t)(const char *buffer, int cursor_pos);
+static completion_callback_t completer = NULL;
+
+void rl_set_completion_callback(completion_callback_t cb) {
+	completer = cb;
+}
+
+char* test_completer(const char *buffer, int cursor_pos) {
+	printf("%s", "COMPLETION");
+	return NULL;
+}
+
+
+
 char *readline(const char *prompt) {
 	EditorState state;
 	state.buflen = INIT_BUF_SIZE;
@@ -349,6 +363,7 @@ char *readline(const char *prompt) {
 		return NULL;
 	}
 	state.buffer[0] = '\0';
+	rl_set_completion_callback(test_completer);
 
 	write(STDOUT_FILENO, prompt, strlen(prompt));
 
@@ -357,6 +372,12 @@ char *readline(const char *prompt) {
 		if (c == '\n' || c == '\r') {
 			// enter
 			break;
+		} else if (c == '\t') {
+			// tab
+			if (completer == NULL) continue;
+			char *completion = completer(state.buffer, state.cursor); // viscursor??
+			if (completion == NULL) continue;
+			// TODO: we should append completion
 		} else if (c == 127 || c == 8) {
 			int width_del = backspace(&state);
 			if (!width_del) continue;
