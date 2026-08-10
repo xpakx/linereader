@@ -356,6 +356,9 @@ int consume_to_space(EditorState *state) {
 	}
 	while (state->cursor > 0 && state->buffer[state->cursor-1] != ' ') {
 		state->cursor--;
+		while (state->cursor > 0 && (state->buffer[state->cursor] & 0xC0) == 0x80) {
+			state->cursor--;
+		}
 		width += check_curr_width(state);
 	}
 	int len = old_cursor - state->cursor;
