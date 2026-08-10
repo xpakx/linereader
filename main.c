@@ -347,22 +347,35 @@ char* test_completer(const char *buffer, int cursor_pos) {
 	return NULL;
 }
 
-void consume_to_space(EditorState *state) {
+int consume_to_space(EditorState *state) {
 	int old_cursor = state->cursor;
+	int width = 0;
 	while (state->cursor > 0 && state->buffer[state->cursor-1] == ' ') {
 		state->cursor--;
+		width++;
 	}
 	while (state->cursor > 0 && state->buffer[state->cursor-1] != ' ') {
 		state->cursor--;
+		width += check_curr_width(state);
 	}
 	int len = old_cursor - state->cursor;
-	if (len == 0) return;
+	if (len == 0) return 0;
 
 	for(int i=old_cursor; i<state->len; i++) {
 		state->buffer[i-len] = state->buffer[i];
 	}
 	state->len = state->len - len;
 	state->buffer[state->len] = '\0';
+	return width;
+}
+
+void consume_to_space_visual(EditorState *state, int width) {
+	visual_jump_left(state, width);
+	write(STDOUT_FILENO, "\033[K", 3);
+	write(STDOUT_FILENO, &state->buffer[state->cursor], state->len-state->cursor);
+	state->vislen -= width;
+	state->viscursor -= width;
+	visual_jump_left(state, state->vislen - state->viscursor);
 }
 
 
@@ -484,7 +497,8 @@ char *readline(const char *prompt) {
 			visual_kill_to_start(&state);
 		} else if (c == 23) { // ctrl+w
 		    	// TODO
-			consume_to_space(&state);
+			int w = consume_to_space(&state);
+			if (w != 0) consume_to_space_visual(&state, w);
 		}
 	}
 
