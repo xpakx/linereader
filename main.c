@@ -458,11 +458,16 @@ char *readline(const char *prompt) {
 				return NULL;
 			}
 			append_visual(&state, c);
-		} else if (c == 3 && state.repl) { // ctrl+c
-			// this shouldn't be active for shell,
-			// but is useful for userspace apps
-			free(state.buffer);
-			exit(0);
+		} else if (c == 3) { // ctrl+c
+			if (state.repl) {
+				// this shouldn't be active for shell,
+				// but is useful for userspace apps
+				free(state.buffer);
+				exit(0);
+			} else if (state.len > 0) {
+				kill_line(&state);
+				visual_kill_line(&state);
+			}
 		} else if (c == 4) {
 			if (state.len == 0) { // ctrl+d
 				free(state.buffer);
@@ -499,7 +504,6 @@ char *readline(const char *prompt) {
 			kill_to_start(&state);
 			visual_kill_to_start(&state);
 		} else if (c == 23) { // ctrl+w
-		    	// TODO
 			int w = consume_to_space(&state);
 			if (w != 0) consume_to_space_visual(&state, w);
 		}
